@@ -1,58 +1,60 @@
 var application = require("application");
 
-function dial(telNum,prompt) {
+function dial(telNum, prompt) {
 
-	try {
-		var intentType = android.content.Intent.ACTION_CALL;
-		if (prompt) {
-			intentType = android.content.Intent.ACTION_DIAL
-		}
+    try {
+        var intentType = android.content.Intent.ACTION_CALL;
+        if (prompt) {
+            intentType = android.content.Intent.ACTION_DIAL
+        }
 
-		var intent = new android.content.Intent(intentType);
+        var intent = new android.content.Intent(intentType);
 
-		intent.setData(android.net.Uri.parse("tel:" + telNum));
+        //support for ussd numbers with # on android
+        telNum = telNum.replace('#', encodeURIComponent('#'));
 
-		application.android.foregroundActivity.startActivity(intent);
-		return true;
+        intent.setData(android.net.Uri.parse("tel:" + telNum));
 
-	} catch(ex) {
-		//alert("Unable to dial");
-		//console.log("phone.dial failed: " + ex);
-		return false;
-	}
+        application.android.foregroundActivity.startActivity(intent);
+        return true;
+
+    } catch (ex) {
+        //alert("Unable to dial");
+        //console.log("phone.dial failed: " + ex);
+        return false;
+    }
 }
 
 function sms(smsNum, messageText) {
-    return new Promise(function (resolve, reject){
-        if(!Array.isArray(smsNum)){
+    return new Promise(function (resolve, reject) {
+        if (!Array.isArray(smsNum)) {
             smsNum = [smsNum];
         }
-        
-    	try {
+
+        try {
             var SEND_SMS = 1001;
-    		var intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
-            intent.putExtra("address", smsNum.join(";"));
-    		intent.putExtra("sms_body", messageText);
+            var intent = new android.content.Intent(android.content.Intent.ACTION_SENDTO);
+            intent.addCategory(android.content.Intent.CATEGORY_DEFAULT);
+            intent.putExtra("sms_body", messageText);
             intent.setType("vnd.android-dir/mms-sms");
-            
+            intent.setData(android.net.Uri.parse("sms:" + smsNum.join(";")));
+
             var previousResult = application.android.onActivityResult;
-            application.android.onActivityResult = function(requestCode, resultCode, data) {
+            application.android.onActivityResult = function (requestCode, resultCode, data) {
                 switch (requestCode) {
-                     case SEND_SMS:
+                    case SEND_SMS:
                         application.android.onActivityResult = previousResult;
-                        if (resultCode === android.app.Activity.RESULT_OK){
+                        if (resultCode === android.app.Activity.RESULT_OK) {
                             return resolve({
-                                response:"success"
+                                response: "success"
                             });
-                        }
-                        else if (resultCode === android.app.Activity.RESULT_CANCELED){
+                        } else if (resultCode === android.app.Activity.RESULT_CANCELED) {
                             return resolve({
-                                response:"cancelled"
+                                response: "cancelled"
                             });
-                        }
-                        else {
+                        } else {
                             return resolve({
-                                response:"failed"
+                                response: "failed"
                             });
                         }
                         break;
@@ -64,9 +66,9 @@ function sms(smsNum, messageText) {
                 }
             };
             application.android.foregroundActivity.startActivityForResult(intent, SEND_SMS);
-    	} catch(ex) {
+        } catch (ex) {
             reject(ex.toString());
-    	}
+        }
     });
 }
 
